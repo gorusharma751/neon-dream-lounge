@@ -143,6 +143,31 @@ export default function AdminPage() {
     a.href = url; a.download = `${filename}.csv`; a.click();
   };
 
+  const [userRoles, setUserRoles] = useState<any[]>([]);
+
+  const fetchUserRoles = async () => {
+    const { data } = await supabase.from('user_roles').select('*');
+    if (data) setUserRoles(data);
+  };
+
+  useEffect(() => {
+    if (isAdmin) fetchUserRoles();
+  }, [isAdmin]);
+
+  const toggleAdmin = async (userId: string, currentlyAdmin: boolean) => {
+    if (currentlyAdmin) {
+      await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', 'admin');
+      toast.success('Admin access removed');
+    } else {
+      const { error } = await supabase.from('user_roles').insert({ user_id: userId, role: 'admin' });
+      if (error) toast.error(error.message);
+      else toast.success('Admin access granted!');
+    }
+    fetchUserRoles();
+  };
+
+  const isUserAdmin = (userId: string) => userRoles.some(r => r.user_id === userId && r.role === 'admin');
+
   if (isAdmin === null) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" /></div>;
 
   const today = new Date();
@@ -173,6 +198,7 @@ export default function AdminPage() {
     { id: 'bookings', label: 'Bookings', icon: CalendarDays },
     { id: 'food', label: 'Food', icon: UtensilsCrossed },
     { id: 'orders', label: 'Orders', icon: Package },
+    { id: 'users', label: 'Users', icon: Users },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -342,6 +368,36 @@ export default function AdminPage() {
                 </div>
               ))}
               {orders.length === 0 && <p className="text-center text-muted-foreground py-8 text-sm">No orders</p>}
+            </div>
+          </div>
+        )}
+
+        {/* Users */}
+        {activeTab === 'users' && (
+          <div>
+            <h3 className="font-orbitron text-sm font-bold text-primary mb-3">User Management</h3>
+            <div className="space-y-2">
+              {users.map(u => {
+                const admin = isUserAdmin(u.user_id);
+                return (
+                  <div key={u.id} className="glass rounded-lg p-3 flex items-center justify-between border border-border/30">
+                    <div>
+                      <p className="font-semibold text-sm">{u.full_name || u.username || 'No Name'}</p>
+                      <p className="text-[10px] text-muted-foreground">{u.mobile_number || 'No phone'}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono">{u.user_id.slice(0, 12)}...</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={admin ? 'destructive' : 'default'}
+                      onClick={() => toggleAdmin(u.user_id, admin)}
+                      className="text-[10px] h-7 font-orbitron"
+                    >
+                      {admin ? 'Remove Admin' : 'Make Admin'}
+                    </Button>
+                  </div>
+                );
+              })}
+              {users.length === 0 && <p className="text-center text-muted-foreground py-8 text-sm">No users</p>}
             </div>
           </div>
         )}
