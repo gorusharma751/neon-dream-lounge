@@ -20,8 +20,10 @@ export type Database = {
           contact_number: string | null
           id: string
           logo_url: string | null
+          mongodb_url: string | null
           theme_color: string | null
           updated_at: string | null
+          use_mongodb: boolean | null
           whatsapp_number: string | null
         }
         Insert: {
@@ -29,8 +31,10 @@ export type Database = {
           contact_number?: string | null
           id?: string
           logo_url?: string | null
+          mongodb_url?: string | null
           theme_color?: string | null
           updated_at?: string | null
+          use_mongodb?: boolean | null
           whatsapp_number?: string | null
         }
         Update: {
@@ -38,8 +42,10 @@ export type Database = {
           contact_number?: string | null
           id?: string
           logo_url?: string | null
+          mongodb_url?: string | null
           theme_color?: string | null
           updated_at?: string | null
+          use_mongodb?: boolean | null
           whatsapp_number?: string | null
         }
         Relationships: []
