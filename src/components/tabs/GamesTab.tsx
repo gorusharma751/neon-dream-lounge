@@ -139,6 +139,15 @@ export default function GamesTab() {
     setSelectedSlot(null);
   };
 
+  // Get current time in IST
+  const getNowIST = () => {
+    const now = new Date();
+    // Convert to IST (UTC+5:30)
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const utc = now.getTime() + now.getTimezoneOffset() * 60 * 1000;
+    return new Date(utc + istOffset);
+  };
+
   const getSlotColor = (slot: TimeSlot) => {
     if (slot.status === 'booked') return 'bg-muted/30 text-muted-foreground/50 cursor-not-allowed';
     if (slot.status === 'reserved') return 'bg-accent/20 text-accent cursor-not-allowed';
@@ -240,7 +249,15 @@ export default function GamesTab() {
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-destructive/50" /> Blocked</span>
             </div>
             <div className="grid grid-cols-4 gap-2">
-              {slots.map((slot) => {
+              {slots.filter((slot) => {
+                // For today, hide past slots based on IST
+                if (selectedDate === 0) {
+                  const nowIST = getNowIST();
+                  const slotTime = new Date(slot.start_time);
+                  return slotTime > nowIST;
+                }
+                return true;
+              }).map((slot) => {
                 const h = new Date(slot.start_time).getHours();
                 const ampm = h >= 12 ? 'PM' : 'AM';
                 const h12 = h % 12 || 12;
@@ -257,8 +274,8 @@ export default function GamesTab() {
                 );
               })}
             </div>
-            {slots.length === 0 && (
-              <p className="text-center text-muted-foreground text-sm py-8">No slots available for this day</p>
+            {slots.filter((slot) => selectedDate === 0 ? new Date(slot.start_time) > getNowIST() : true).length === 0 && (
+              <p className="text-center text-muted-foreground text-sm py-8">No upcoming slots available for this day</p>
             )}
           </div>
         </div>
