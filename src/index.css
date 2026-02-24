@@ -144,6 +144,14 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Hide scrollbar */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Safe area padding */
+.safe-area-top { padding-top: env(safe-area-inset-top); }
+.safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
 /* Neon cursor glow */
 .cursor-glow {
   pointer-events: none;
