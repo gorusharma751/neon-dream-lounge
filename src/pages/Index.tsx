@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import MobileHeader from '@/components/MobileHeader';
 import BottomNav from '@/components/BottomNav';
 import GamesTab from '@/components/tabs/GamesTab';
@@ -24,17 +24,14 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <MobileHeader />
       <main className="pt-16 pb-20">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.2 }}
-          >
-            {renderTab()}
-          </motion.div>
-        </AnimatePresence>
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          {renderTab()}
+        </motion.div>
       </main>
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
