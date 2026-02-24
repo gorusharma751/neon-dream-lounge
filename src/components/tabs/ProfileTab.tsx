@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, Lock, LogOut, Shield, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, Lock, LogOut, Shield, Loader2, Download, Smartphone } from 'lucide-react';
 
 export default function ProfileTab() {
   const [user, setUser] = useState<any>(null);
@@ -16,7 +16,43 @@ export default function ProfileTab() {
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [settings, setSettings] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isAppInstalled, setIsAppInstalled] = useState(false);
   const navigate = useNavigate();
+
+  // PWA install prompt listener
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+
+    // Check if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsAppInstalled(true);
+    }
+    window.addEventListener('appinstalled', () => setIsAppInstalled(true));
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        toast.success('App installing! 🎮');
+        setIsAppInstalled(true);
+      }
+      setDeferredPrompt(null);
+    } else {
+      // iOS Safari doesn't support beforeinstallprompt
+      toast.info('Tap the Share button (↑) then "Add to Home Screen" to install the app', { duration: 5000 });
+    }
+  };
 
   useEffect(() => {
     loadProfile();
@@ -162,6 +198,21 @@ export default function ProfileTab() {
           <Button onClick={() => navigate('/admin')} variant="outline" className="w-full border-accent text-accent font-orbitron text-xs">
             <Shield size={14} className="mr-1" /> Open Admin Panel
           </Button>
+        )}
+
+        {/* Download App */}
+        {!isAppInstalled && (
+          <Button
+            onClick={handleInstallClick}
+            className="w-full bg-gradient-to-r from-primary to-accent text-primary-foreground font-orbitron text-xs neon-glow-blue"
+          >
+            <Download size={14} className="mr-1" /> Download App
+          </Button>
+        )}
+        {isAppInstalled && (
+          <div className="glass rounded-lg p-3 flex items-center gap-2 text-xs text-neon-green">
+            <Smartphone size={14} /> App Installed ✓
+          </div>
         )}
 
         {/* Logout */}
