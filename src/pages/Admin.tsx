@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
+import { Switch } from '@/components/ui/switch';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart3, Monitor, UtensilsCrossed, CalendarDays, Package, Plus, Trash2,
@@ -36,7 +37,7 @@ export default function AdminPage() {
   const [stationForm, setStationForm] = useState({ name: '', station_number: '', hourly_rate: '100', description: '' });
   const [categoryForm, setCategoryForm] = useState({ name: '', icon: '' });
   const [foodForm, setFoodForm] = useState({ name: '', description: '', price: '', category_id: '', image_url: '' });
-  const [settingsForm, setSettingsForm] = useState({ contact_number: '', about_text: '', whatsapp_number: '', logo_url: '' });
+  const [settingsForm, setSettingsForm] = useState({ contact_number: '', about_text: '', whatsapp_number: '', logo_url: '', mongodb_url: '', use_mongodb: false });
   const [showStationDialog, setShowStationDialog] = useState(false);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [showFoodDialog, setShowFoodDialog] = useState(false);
@@ -69,7 +70,7 @@ export default function AdminPage() {
     supabase.from('admin_settings').select('*').limit(1).single().then(({ data }) => {
       if (data) {
         setSettings(data);
-        setSettingsForm({ contact_number: data.contact_number || '', about_text: data.about_text || '', whatsapp_number: data.whatsapp_number || '', logo_url: data.logo_url || '' });
+        setSettingsForm({ contact_number: data.contact_number || '', about_text: data.about_text || '', whatsapp_number: data.whatsapp_number || '', logo_url: data.logo_url || '', mongodb_url: (data as any).mongodb_url || '', use_mongodb: (data as any).use_mongodb || false });
       }
     });
     supabase.from('profiles').select('*').then(({ data }) => data && setUsers(data));
@@ -128,7 +129,8 @@ export default function AdminPage() {
 
   const saveSettings = async () => {
     if (!settings?.id) return;
-    await supabase.from('admin_settings').update(settingsForm).eq('id', settings.id);
+    const updateData: any = { ...settingsForm };
+    await supabase.from('admin_settings').update(updateData).eq('id', settings.id);
     toast.success('Settings saved!'); fetchAll();
   };
 
@@ -416,6 +418,33 @@ export default function AdminPage() {
               className="w-full h-24 rounded-md bg-muted/30 border border-border/50 px-3 py-2 text-sm text-foreground resize-none"
             />
             <Button onClick={saveSettings} className="w-full bg-primary text-primary-foreground hover:bg-primary/80 font-orbitron text-xs">Save Settings</Button>
+
+            {/* MongoDB Section */}
+            <div className="border-t border-border/30 pt-4 mt-4">
+              <h3 className="font-orbitron text-sm font-bold text-accent flex items-center gap-2 mb-3">
+                🗄️ External Database (MongoDB)
+              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Use MongoDB</p>
+                  <p className="text-[10px] text-muted-foreground">Enable to use MongoDB as secondary database</p>
+                </div>
+                <Switch
+                  checked={settingsForm.use_mongodb}
+                  onCheckedChange={(checked) => setSettingsForm(p => ({ ...p, use_mongodb: checked }))}
+                />
+              </div>
+              {settingsForm.use_mongodb && (
+                <Input
+                  placeholder="mongodb+srv://username:password@cluster.mongodb.net/dbname"
+                  value={settingsForm.mongodb_url}
+                  onChange={e => setSettingsForm(p => ({ ...p, mongodb_url: e.target.value }))}
+                  className="bg-muted/30 border-border/50 text-sm font-mono text-xs"
+                  type="password"
+                />
+              )}
+              <p className="text-[9px] text-muted-foreground mt-1.5">⚠️ MongoDB URL is stored securely. Only admins can view/edit.</p>
+            </div>
           </div>
         )}
       </div>
