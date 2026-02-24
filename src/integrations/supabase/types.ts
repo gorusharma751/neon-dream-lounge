@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_settings: {
+        Row: {
+          about_text: string | null
+          contact_number: string | null
+          id: string
+          logo_url: string | null
+          theme_color: string | null
+          updated_at: string | null
+          whatsapp_number: string | null
+        }
+        Insert: {
+          about_text?: string | null
+          contact_number?: string | null
+          id?: string
+          logo_url?: string | null
+          theme_color?: string | null
+          updated_at?: string | null
+          whatsapp_number?: string | null
+        }
+        Update: {
+          about_text?: string | null
+          contact_number?: string | null
+          id?: string
+          logo_url?: string | null
+          theme_color?: string | null
+          updated_at?: string | null
+          whatsapp_number?: string | null
+        }
+        Relationships: []
+      }
       bookings: {
         Row: {
           created_at: string
@@ -183,6 +213,36 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+          read_status: boolean | null
+          title: string
+          type: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+          read_status?: boolean | null
+          title: string
+          type?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+          read_status?: boolean | null
+          title?: string
+          type?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           booking_id: string | null
@@ -266,7 +326,9 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          full_name: string | null
           id: string
+          mobile_number: string | null
           updated_at: string
           user_id: string
           username: string | null
@@ -274,7 +336,9 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          full_name?: string | null
           id?: string
+          mobile_number?: string | null
           updated_at?: string
           user_id: string
           username?: string | null
@@ -282,7 +346,9 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          full_name?: string | null
           id?: string
+          mobile_number?: string | null
           updated_at?: string
           user_id?: string
           username?: string | null
@@ -292,27 +358,39 @@ export type Database = {
       time_slots: {
         Row: {
           created_at: string
+          duration_minutes: number
           end_time: string
           id: string
           is_booked: boolean
+          reserved_by: string | null
+          reserved_until: string | null
           start_time: string
           station_id: string
+          status: string
         }
         Insert: {
           created_at?: string
+          duration_minutes?: number
           end_time: string
           id?: string
           is_booked?: boolean
+          reserved_by?: string | null
+          reserved_until?: string | null
           start_time: string
           station_id: string
+          status?: string
         }
         Update: {
           created_at?: string
+          duration_minutes?: number
           end_time?: string
           id?: string
           is_booked?: boolean
+          reserved_by?: string | null
+          reserved_until?: string | null
           start_time?: string
           station_id?: string
+          status?: string
         }
         Relationships: [
           {
