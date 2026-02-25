@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   BarChart3, Monitor, UtensilsCrossed, CalendarDays, Package, Plus, Trash2,
   Bell, Clock, Settings, TrendingUp, Users, DollarSign, Gamepad2,
-  Download, ChevronLeft, Edit, Ban
+  Download, ChevronLeft, Edit, Ban, CheckCircle
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import {
@@ -125,6 +125,18 @@ export default function AdminPage() {
   const blockSlot = async (slotId: string) => {
     await supabase.from('time_slots').update({ status: 'blocked' }).eq('id', slotId);
     toast.success('Slot blocked'); fetchAll();
+  };
+
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+    if (error) toast.error(error.message);
+    else { toast.success(`Order ${newStatus}!`); fetchAll(); }
+  };
+
+  const updateBookingStatus = async (bookingId: string, newStatus: string) => {
+    const { error } = await supabase.from('bookings').update({ status: newStatus }).eq('id', bookingId);
+    if (error) toast.error(error.message);
+    else { toast.success(`Booking ${newStatus}!`); fetchAll(); }
   };
 
   const saveSettings = async () => {
@@ -325,7 +337,14 @@ export default function AdminPage() {
                       <p className="text-[10px] text-foreground mt-1">👤 {customer?.full_name || customer?.username || 'Unknown'}</p>
                       <p className="text-[10px] text-muted-foreground">📱 {customer?.mobile_number || 'No phone'}</p>
                     </div>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${b.status === 'confirmed' ? 'bg-neon-green/20 text-neon-green' : 'bg-muted text-muted-foreground'}`}>{b.status}</span>
+                    <div className="flex flex-col items-end gap-1.5">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${b.status === 'completed' ? 'bg-neon-green/20 text-neon-green' : b.status === 'confirmed' ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>{b.status}</span>
+                      {b.status !== 'completed' && (
+                        <Button size="sm" onClick={() => updateBookingStatus(b.id, 'completed')} className="text-[9px] h-6 px-2 bg-neon-green/90 text-black hover:bg-neon-green">
+                          <CheckCircle size={10} className="mr-0.5" /> Complete
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
                 );
@@ -372,7 +391,21 @@ export default function AdminPage() {
                       <p className="text-primary font-orbitron font-bold text-sm mt-1">₹{o.total_amount}</p>
                       <p className="text-[10px] text-muted-foreground">{format(new Date(o.created_at), 'MMM dd, h:mm a')} · #{o.id.slice(0, 8)}</p>
                     </div>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${o.status === 'confirmed' ? 'bg-neon-green/20 text-neon-green' : 'bg-muted text-muted-foreground'}`}>{o.status}</span>
+                    <div className="flex flex-col items-end gap-1.5">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${o.status === 'completed' ? 'bg-neon-green/20 text-neon-green' : o.status === 'preparing' ? 'bg-accent/20 text-accent' : 'bg-primary/20 text-primary'}`}>{o.status}</span>
+                      {o.status !== 'completed' && (
+                        <div className="flex gap-1">
+                          {o.status === 'pending' && (
+                            <Button size="sm" onClick={() => updateOrderStatus(o.id, 'preparing')} className="text-[9px] h-6 px-2 bg-accent text-accent-foreground hover:bg-accent/80">
+                              🔄 Prepare
+                            </Button>
+                          )}
+                          <Button size="sm" onClick={() => updateOrderStatus(o.id, 'completed')} className="text-[9px] h-6 px-2 bg-neon-green/90 text-black hover:bg-neon-green">
+                            <CheckCircle size={10} className="mr-0.5" /> Complete
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 );
