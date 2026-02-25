@@ -69,7 +69,7 @@ export default function GamesTab() {
     const dayStart = targetDate.toISOString();
     const dayEnd = addDays(targetDate, 1).toISOString();
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('time_slots')
       .select('*')
       .eq('station_id', selectedStation.id)
@@ -77,7 +77,12 @@ export default function GamesTab() {
       .lt('start_time', dayEnd)
       .order('start_time');
 
-    if (data) setSlots(data as any);
+    if (error) {
+      setSlots([]);
+      return;
+    }
+
+    setSlots((data ?? []) as TimeSlot[]);
   };
 
   const handleBookSlot = async () => {
@@ -139,14 +144,8 @@ export default function GamesTab() {
     setSelectedSlot(null);
   };
 
-  // Get current time in IST
-  const getNowIST = () => {
-    const now = new Date();
-    // Convert to IST (UTC+5:30)
-    const istOffset = 5.5 * 60 * 60 * 1000;
-    const utc = now.getTime() + now.getTimezoneOffset() * 60 * 1000;
-    return new Date(utc + istOffset);
-  };
+  // Use absolute current time for robust future-slot filtering across devices/timezones
+  const getNow = () => new Date();
 
   const getSlotColor = (slot: TimeSlot) => {
     if (slot.status === 'booked') return 'bg-muted/30 text-muted-foreground/50 cursor-not-allowed';
@@ -250,11 +249,11 @@ export default function GamesTab() {
             </div>
             <div className="grid grid-cols-4 gap-2">
               {slots.filter((slot) => {
-                // For today, hide past slots based on IST
+                // For today, hide past slots
                 if (selectedDate === 0) {
-                  const nowIST = getNowIST();
+                  const now = getNow();
                   const slotTime = new Date(slot.start_time);
-                  return slotTime > nowIST;
+                  return slotTime > now;
                 }
                 return true;
               }).map((slot) => {
@@ -274,7 +273,7 @@ export default function GamesTab() {
                 );
               })}
             </div>
-            {slots.filter((slot) => selectedDate === 0 ? new Date(slot.start_time) > getNowIST() : true).length === 0 && (
+            {slots.filter((slot) => selectedDate === 0 ? new Date(slot.start_time) > getNow() : true).length === 0 && (
               <p className="text-center text-muted-foreground text-sm py-8">No upcoming slots available for this day</p>
             )}
           </div>
