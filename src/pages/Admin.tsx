@@ -314,18 +314,22 @@ export default function AdminPage() {
           <div>
             <Button size="sm" variant="outline" onClick={() => exportCSV(bookings, 'bookings')} className="mb-3 text-xs border-border/30"><Download size={12} className="mr-1" /> Export CSV</Button>
             <div className="space-y-2">
-              {bookings.map(b => (
+              {bookings.map(b => {
+                const customer = users.find(u => u.user_id === b.user_id);
+                return (
                 <div key={b.id} className="glass rounded-lg p-3 border border-border/30">
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-semibold text-sm">{(b.gaming_stations as any)?.name}</p>
                       <p className="text-xs text-muted-foreground">{b.time_slots ? `${format(new Date((b.time_slots as any).start_time), 'MMM dd, h:mm a')}` : '-'}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">User: {b.user_id.slice(0, 8)}</p>
+                      <p className="text-[10px] text-foreground mt-1">👤 {customer?.full_name || customer?.username || 'Unknown'}</p>
+                      <p className="text-[10px] text-muted-foreground">📱 {customer?.mobile_number || 'No phone'}</p>
                     </div>
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${b.status === 'confirmed' ? 'bg-neon-green/20 text-neon-green' : 'bg-muted text-muted-foreground'}`}>{b.status}</span>
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {bookings.length === 0 && <p className="text-center text-muted-foreground py-8 text-sm">No bookings</p>}
             </div>
           </div>
@@ -357,18 +361,22 @@ export default function AdminPage() {
           <div>
             <Button size="sm" variant="outline" onClick={() => exportCSV(orders, 'orders')} className="mb-3 text-xs border-border/30"><Download size={12} className="mr-1" /> Export CSV</Button>
             <div className="space-y-2">
-              {orders.map(o => (
+              {orders.map(o => {
+                const customer = users.find(u => u.user_id === o.user_id);
+                return (
                 <div key={o.id} className="glass rounded-lg p-3 border border-border/30">
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="font-mono text-xs text-muted-foreground">#{o.id.slice(0, 8)}</p>
-                      <p className="text-primary font-orbitron font-bold text-sm">₹{o.total_amount}</p>
-                      <p className="text-[10px] text-muted-foreground">{format(new Date(o.created_at), 'MMM dd, h:mm a')}</p>
+                      <p className="font-semibold text-sm">👤 {customer?.full_name || customer?.username || 'Unknown'}</p>
+                      <p className="text-[10px] text-muted-foreground">📱 {customer?.mobile_number || 'No phone'}</p>
+                      <p className="text-primary font-orbitron font-bold text-sm mt-1">₹{o.total_amount}</p>
+                      <p className="text-[10px] text-muted-foreground">{format(new Date(o.created_at), 'MMM dd, h:mm a')} · #{o.id.slice(0, 8)}</p>
                     </div>
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${o.status === 'confirmed' ? 'bg-neon-green/20 text-neon-green' : 'bg-muted text-muted-foreground'}`}>{o.status}</span>
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {orders.length === 0 && <p className="text-center text-muted-foreground py-8 text-sm">No orders</p>}
             </div>
           </div>
