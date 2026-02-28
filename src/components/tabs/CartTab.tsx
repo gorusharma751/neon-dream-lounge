@@ -50,45 +50,49 @@ export default function CartTab() {
 
   const fetchAll = async () => {
     setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); return; }
-    const token = session.access_token;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setLoading(false); return; }
+      const token = session.access_token;
 
-    // Fetch cart items with food_items join
-    const { data: cartData } = await restSelect('cart_items', {
-      select: 'id,quantity,food_item_id,food_items(name,price,image_url)',
-      user_id: `eq.${session.user.id}`,
-    }, token);
-    setItems((cartData as any) || []);
+      // Fetch cart items with food_items join
+      const { data: cartData } = await restSelect('cart_items', {
+        select: 'id,quantity,food_item_id,food_items(name,price,image_url)',
+        user_id: `eq.${session.user.id}`,
+      }, token);
+      setItems((cartData as any) || []);
 
-    // Fetch orders with items
-    const { data: orderData } = await restSelect('orders', {
-      select: 'id,status,total_amount,created_at,order_items(item_name,quantity,price)',
-      user_id: `eq.${session.user.id}`,
-      order: 'created_at.desc',
-    }, token);
-    setOrders((orderData as any) || []);
+      // Fetch orders with items
+      const { data: orderData } = await restSelect('orders', {
+        select: 'id,status,total_amount,created_at,order_items(item_name,quantity,price)',
+        user_id: `eq.${session.user.id}`,
+        order: 'created_at.desc',
+      }, token);
+      setOrders((orderData as any) || []);
 
-    // Fetch bookings
-    const { data: bookingData } = await restSelect('bookings', {
-      select: 'id,status,created_at,gaming_stations(name),time_slots(start_time,end_time)',
-      user_id: `eq.${session.user.id}`,
-      order: 'created_at.desc',
-    }, token);
-    setBookings((bookingData as any) || []);
+      // Fetch bookings
+      const { data: bookingData } = await restSelect('bookings', {
+        select: 'id,status,created_at,gaming_stations(name),time_slots(start_time,end_time)',
+        user_id: `eq.${session.user.id}`,
+        order: 'created_at.desc',
+      }, token);
+      setBookings((bookingData as any) || []);
 
-    // Fetch profile for auto-fill
-    const { data: profileArr } = await restSelect('profiles', {
-      select: 'full_name,mobile_number,username',
-      user_id: `eq.${session.user.id}`,
-    }, token);
-    const profile = profileArr?.[0];
-    if (profile) {
-      setName((profile as any).full_name || (profile as any).username || '');
-      setMobile((profile as any).mobile_number || '');
+      // Fetch profile for auto-fill
+      const { data: profileArr } = await restSelect('profiles', {
+        select: 'full_name,mobile_number,username',
+        user_id: `eq.${session.user.id}`,
+      }, token);
+      const profile = profileArr?.[0];
+      if (profile) {
+        setName((profile as any).full_name || (profile as any).username || '');
+        setMobile((profile as any).mobile_number || '');
+      }
+    } catch (err) {
+      console.error('Cart fetch error:', err);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const removeItem = async (id: string) => {
