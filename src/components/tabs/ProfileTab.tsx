@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
+import { restSelect, restUpdate, restRpc } from '@/lib/supabaseRest';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, Lock, LogOut, Shield, Loader2, Download, Smartphone } from 'lucide-react';
+import { User, Lock, LogOut, Shield, Loader2, Download, Smartphone } from 'lucide-react';
 
 export default function ProfileTab() {
   const [user, setUser] = useState<any>(null);
@@ -20,63 +21,51 @@ export default function ProfileTab() {
   const [isAppInstalled, setIsAppInstalled] = useState(false);
   const navigate = useNavigate();
 
-  // PWA install prompt listener
   useEffect(() => {
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
+    const handler = (e: Event) => { e.preventDefault(); setDeferredPrompt(e); };
     window.addEventListener('beforeinstallprompt', handler);
-
-    // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsAppInstalled(true);
-    }
+    if (window.matchMedia('(display-mode: standalone)').matches) setIsAppInstalled(true);
     window.addEventListener('appinstalled', () => setIsAppInstalled(true));
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handler);
-    };
+    return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        toast.success('App installing! 🎮');
-        setIsAppInstalled(true);
-      }
+      if (outcome === 'accepted') { toast.success('App installing! 🎮'); setIsAppInstalled(true); }
       setDeferredPrompt(null);
     } else {
-      // iOS Safari doesn't support beforeinstallprompt
       toast.info('Tap the Share button (↑) then "Add to Home Screen" to install the app', { duration: 5000 });
     }
   };
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
+  useEffect(() => { loadProfile(); }, []);
 
   const loadProfile = async () => {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setLoading(false); return; }
+    const token = session.access_token;
 
     setUser(session.user);
 
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .maybeSingle();
-    setProfile(profileData);
+    const { data: profileArr } = await restSelect('profiles', {
+      user_id: `eq.${session.user.id}`,
+    }, token);
+    setProfile(profileArr?.[0] || null);
 
-    const { data: adminCheck } = await supabase.rpc('has_role', { _user_id: session.user.id, _role: 'admin' });
+    const { data: adminCheck } = await restRpc('has_role', {
+      _user_id: session.user.id,
+      _role: 'admin',
+    }, token);
     setIsAdmin(!!adminCheck);
 
-    const { data: settingsData } = await supabase.from('admin_settings').select('about_text').limit(1).maybeSingle();
-    setSettings(settingsData);
+    const { data: settingsArr } = await restSelect('admin_settings', {
+      select: 'about_text',
+      limit: '1',
+    });
+    setSettings(settingsArr?.[0] || null);
 
     setLoading(false);
   };
@@ -84,11 +73,14 @@ export default function ProfileTab() {
   const saveProfile = async () => {
     if (!user || !profile) return;
     setSaving(true);
-    await supabase.from('profiles').update({
-      full_name: profile.full_name,
-      username: profile.username,
-      mobile_number: profile.mobile_number,
-    }).eq('user_id', user.id);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      await restUpdate('profiles', {
+        full_name: profile.full_name,
+        username: profile.username,
+        mobile_number: profile.mobile_number,
+      }, { user_id: `eq.${user.id}` }, session.access_token);
+    }
     toast.success('Profile updated!');
     setSaving(false);
   };
@@ -113,55 +105,35 @@ export default function ProfileTab() {
         <User size={48} className="mx-auto text-muted-foreground/30 mb-4" />
         <h2 className="font-orbitron text-lg font-bold mb-2">Login Required</h2>
         <p className="text-muted-foreground text-sm mb-4">Sign in to view your profile</p>
-        <Button onClick={() => navigate('/auth')} className="bg-primary text-primary-foreground font-orbitron neon-glow-blue">
-          Login / Sign Up
-        </Button>
+        <Button onClick={() => navigate('/auth')} className="bg-primary text-primary-foreground font-orbitron neon-glow-blue">Login / Sign Up</Button>
       </div>
     );
   }
 
   return (
     <div className="px-4 pb-4 space-y-4">
-      {/* Avatar & name */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center py-4">
         <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3 neon-glow-blue">
           <User size={28} className="text-primary" />
         </div>
         <h2 className="font-orbitron text-base font-bold">{profile?.full_name || profile?.username || 'Gamer'}</h2>
         <p className="text-xs text-muted-foreground">{user.email}</p>
-        {isAdmin && (
-          <span className="inline-flex items-center gap-1 text-[10px] text-accent font-semibold mt-1">
-            <Shield size={10} /> Admin
-          </span>
-        )}
+        {isAdmin && <span className="inline-flex items-center gap-1 text-[10px] text-accent font-semibold mt-1"><Shield size={10} /> Admin</span>}
       </motion.div>
 
-      {/* Profile fields */}
       <div className="space-y-3">
         <div className="glass rounded-lg p-3 space-y-3">
           <div>
             <label className="text-[10px] text-muted-foreground uppercase font-semibold">Full Name</label>
-            <Input
-              value={profile?.full_name || ''}
-              onChange={e => setProfile((p: any) => ({ ...p, full_name: e.target.value }))}
-              className="bg-muted/30 border-border/50 text-sm mt-1"
-            />
+            <Input value={profile?.full_name || ''} onChange={e => setProfile((p: any) => ({ ...p, full_name: e.target.value }))} className="bg-muted/30 border-border/50 text-sm mt-1" />
           </div>
           <div>
             <label className="text-[10px] text-muted-foreground uppercase font-semibold">Username</label>
-            <Input
-              value={profile?.username || ''}
-              onChange={e => setProfile((p: any) => ({ ...p, username: e.target.value }))}
-              className="bg-muted/30 border-border/50 text-sm mt-1"
-            />
+            <Input value={profile?.username || ''} onChange={e => setProfile((p: any) => ({ ...p, username: e.target.value }))} className="bg-muted/30 border-border/50 text-sm mt-1" />
           </div>
           <div>
             <label className="text-[10px] text-muted-foreground uppercase font-semibold">Mobile Number</label>
-            <Input
-              value={profile?.mobile_number || ''}
-              onChange={e => setProfile((p: any) => ({ ...p, mobile_number: e.target.value }))}
-              className="bg-muted/30 border-border/50 text-sm mt-1"
-            />
+            <Input value={profile?.mobile_number || ''} onChange={e => setProfile((p: any) => ({ ...p, mobile_number: e.target.value }))} className="bg-muted/30 border-border/50 text-sm mt-1" />
           </div>
           <div>
             <label className="text-[10px] text-muted-foreground uppercase font-semibold">Email</label>
@@ -172,7 +144,6 @@ export default function ProfileTab() {
           </Button>
         </div>
 
-        {/* About section */}
         {settings?.about_text && (
           <div className="glass rounded-lg p-3">
             <h3 className="font-orbitron text-xs font-bold text-primary mb-2">About Us</h3>
@@ -180,7 +151,6 @@ export default function ProfileTab() {
           </div>
         )}
 
-        {/* Change password */}
         <div className="glass rounded-lg p-3">
           <button onClick={() => setShowPasswordChange(!showPasswordChange)} className="flex items-center gap-2 text-sm font-semibold w-full">
             <Lock size={14} className="text-muted-foreground" /> Change Password
@@ -193,29 +163,21 @@ export default function ProfileTab() {
           )}
         </div>
 
-        {/* Admin link */}
         {isAdmin && (
           <Button onClick={() => navigate('/admin')} variant="outline" className="w-full border-accent text-accent font-orbitron text-xs">
             <Shield size={14} className="mr-1" /> Open Admin Panel
           </Button>
         )}
 
-        {/* Download App */}
         {!isAppInstalled && (
-          <Button
-            onClick={handleInstallClick}
-            className="w-full bg-gradient-to-r from-primary to-accent text-primary-foreground font-orbitron text-xs neon-glow-blue"
-          >
+          <Button onClick={handleInstallClick} className="w-full bg-gradient-to-r from-primary to-accent text-primary-foreground font-orbitron text-xs neon-glow-blue">
             <Download size={14} className="mr-1" /> Download App
           </Button>
         )}
         {isAppInstalled && (
-          <div className="glass rounded-lg p-3 flex items-center gap-2 text-xs text-neon-green">
-            <Smartphone size={14} /> App Installed ✓
-          </div>
+          <div className="glass rounded-lg p-3 flex items-center gap-2 text-xs text-neon-green"><Smartphone size={14} /> App Installed ✓</div>
         )}
 
-        {/* Logout */}
         <Button onClick={handleLogout} variant="ghost" className="w-full text-destructive hover:text-destructive font-orbitron text-xs">
           <LogOut size={14} className="mr-1" /> Logout
         </Button>

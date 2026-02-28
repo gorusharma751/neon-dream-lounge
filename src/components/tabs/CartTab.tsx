@@ -4,6 +4,7 @@ import { Trash2, Minus, Plus, ShoppingBag, CalendarDays, Loader2, CheckCircle, C
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
+import { restSelect, restInsert, restUpdate, restDelete } from '@/lib/supabaseRest';
 import { useCart } from '@/hooks/useCart';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -51,53 +52,58 @@ export default function CartTab() {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setLoading(false); return; }
+    const token = session.access_token;
 
-    // Fetch cart items
-    const { data: cartData } = await supabase
-      .from('cart_items')
-      .select('id, quantity, food_item_id, food_items(name, price, image_url)')
-      .eq('user_id', session.user.id);
+    // Fetch cart items with food_items join
+    const { data: cartData } = await restSelect('cart_items', {
+      select: 'id,quantity,food_item_id,food_items(name,price,image_url)',
+      user_id: `eq.${session.user.id}`,
+    }, token);
     setItems((cartData as any) || []);
 
     // Fetch orders with items
-    const { data: orderData } = await supabase
-      .from('orders')
-      .select('id, status, total_amount, created_at, order_items(item_name, quantity, price)')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false });
+    const { data: orderData } = await restSelect('orders', {
+      select: 'id,status,total_amount,created_at,order_items(item_name,quantity,price)',
+      user_id: `eq.${session.user.id}`,
+      order: 'created_at.desc',
+    }, token);
     setOrders((orderData as any) || []);
 
     // Fetch bookings
-    const { data: bookingData } = await supabase
-      .from('bookings')
-      .select('id, status, created_at, gaming_stations(name), time_slots(start_time, end_time)')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false });
+    const { data: bookingData } = await restSelect('bookings', {
+      select: 'id,status,created_at,gaming_stations(name),time_slots(start_time,end_time)',
+      user_id: `eq.${session.user.id}`,
+      order: 'created_at.desc',
+    }, token);
     setBookings((bookingData as any) || []);
 
     // Fetch profile for auto-fill
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, mobile_number, username')
-      .eq('user_id', session.user.id)
-      .maybeSingle();
+    const { data: profileArr } = await restSelect('profiles', {
+      select: 'full_name,mobile_number,username',
+      user_id: `eq.${session.user.id}`,
+    }, token);
+    const profile = profileArr?.[0];
     if (profile) {
-      setName(profile.full_name || profile.username || '');
-      setMobile(profile.mobile_number || '');
+      setName((profile as any).full_name || (profile as any).username || '');
+      setMobile((profile as any).mobile_number || '');
     }
 
     setLoading(false);
   };
 
   const removeItem = async (id: string) => {
-    await supabase.from('cart_items').delete().eq('id', id);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    await restDelete('cart_items', { id: `eq.${id}` }, session.access_token);
     fetchAll();
     refreshCart();
   };
 
   const updateQty = async (id: string, qty: number) => {
     if (qty < 1) return removeItem(id);
-    await supabase.from('cart_items').update({ quantity: qty }).eq('id', id);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    await restUpdate('cart_items', { quantity: qty }, { id: `eq.${id}` }, session.access_token);
     setItems(prev => prev.map(i => i.id === id ? { ...i, quantity: qty } : i));
   };
 
@@ -108,19 +114,21 @@ export default function CartTab() {
     setCheckingOut(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setCheckingOut(false); return; }
+    const token = session.access_token;
 
-    await supabase.from('profiles').update({
+    await restUpdate('profiles', {
       full_name: name,
       mobile_number: mobile,
-    }).eq('user_id', session.user.id);
+    }, { user_id: `eq.${session.user.id}` }, token);
 
     if (items.length > 0) {
-      const { data: order, error } = await supabase
-        .from('orders')
-        .insert({ user_id: session.user.id, total_amount: total, status: 'confirmed' })
-        .select()
-        .single();
+      const { data: orderArr, error } = await restInsert('orders', {
+        user_id: session.user.id,
+        total_amount: total,
+        status: 'confirmed',
+      }, token);
 
+      const order = orderArr?.[0] as any;
       if (error || !order) {
         toast.error('Checkout failed');
         setCheckingOut(false);
@@ -135,8 +143,8 @@ export default function CartTab() {
         price: (i.food_items?.price || 0) * i.quantity,
       }));
 
-      await supabase.from('order_items').insert(orderItems);
-      await supabase.from('cart_items').delete().eq('user_id', session.user.id);
+      await restInsert('order_items', orderItems, token);
+      await restDelete('cart_items', { user_id: `eq.${session.user.id}` }, token);
     }
 
     setCheckoutSuccess(true);
@@ -152,10 +160,8 @@ export default function CartTab() {
     return <div className="flex items-center justify-center py-20"><Loader2 className="animate-spin text-primary" size={24} /></div>;
   }
 
-  // Active orders = not completed (confirmed/pending/processing)
   const activeOrders = orders.filter(o => o.status !== 'completed');
   const completedOrders = orders.filter(o => o.status === 'completed');
-
   const upcomingBookings = bookings.filter(b => b.status === 'confirmed' && b.time_slots && new Date(b.time_slots.start_time) >= new Date());
   const pastBookings = bookings.filter(b => !upcomingBookings.includes(b));
 
@@ -181,15 +187,9 @@ export default function CartTab() {
 
   return (
     <div className="px-4 pb-4">
-      {/* Success animation */}
       <AnimatePresence>
         {checkoutSuccess && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80"
-          >
+          <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-background/80">
             <div className="text-center">
               <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200 }}>
                 <CheckCircle size={64} className="text-neon-green mx-auto mb-4" />
@@ -201,52 +201,30 @@ export default function CartTab() {
         )}
       </AnimatePresence>
 
-      {/* Toggle: Cart / History */}
       <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => setShowHistory(false)}
-          className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
-            !showHistory ? 'bg-primary text-primary-foreground neon-glow-blue' : 'glass text-muted-foreground'
-          }`}
-        >
+        <button onClick={() => setShowHistory(false)} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${!showHistory ? 'bg-primary text-primary-foreground neon-glow-blue' : 'glass text-muted-foreground'}`}>
           <ShoppingBag size={14} className="inline mr-1" /> Cart {items.length > 0 && `(${items.length})`} {activeOrders.length > 0 && `· ${activeOrders.length} active`}
         </button>
-        <button
-          onClick={() => setShowHistory(true)}
-          className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
-            showHistory ? 'bg-primary text-primary-foreground neon-glow-blue' : 'glass text-muted-foreground'
-          }`}
-        >
+        <button onClick={() => setShowHistory(true)} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${showHistory ? 'bg-primary text-primary-foreground neon-glow-blue' : 'glass text-muted-foreground'}`}>
           <CalendarDays size={14} className="inline mr-1" /> History
         </button>
       </div>
 
       {!showHistory ? (
         <div className="space-y-4">
-          {/* Active Orders (Processing) */}
           {activeOrders.length > 0 && (
             <div>
-              <h3 className="font-orbitron text-xs font-bold text-accent mb-2 flex items-center gap-1">
-                <Clock size={12} /> ACTIVE ORDERS
-              </h3>
+              <h3 className="font-orbitron text-xs font-bold text-accent mb-2 flex items-center gap-1"><Clock size={12} /> ACTIVE ORDERS</h3>
               <div className="space-y-2">
                 {activeOrders.map(order => (
-                  <motion.div
-                    key={order.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`glass rounded-lg p-3 border ${getStatusStyle(order.status)}`}
-                  >
+                  <motion.div key={order.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`glass rounded-lg p-3 border ${getStatusStyle(order.status)}`}>
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <p className="text-[10px] text-muted-foreground font-mono">#{order.id.slice(0, 8)}</p>
                         <p className="text-primary font-orbitron font-bold text-sm">₹{order.total_amount}</p>
                       </div>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${getStatusStyle(order.status)}`}>
-                        {getStatusLabel(order.status)}
-                      </span>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${getStatusStyle(order.status)}`}>{getStatusLabel(order.status)}</span>
                     </div>
-                    {/* Order items list */}
                     <div className="space-y-1">
                       {order.order_items?.map((oi, idx) => (
                         <div key={idx} className="flex justify-between text-[11px]">
@@ -262,13 +240,10 @@ export default function CartTab() {
             </div>
           )}
 
-          {/* Cart Items */}
           {items.length > 0 && (
             <div>
               {activeOrders.length > 0 && (
-                <h3 className="font-orbitron text-xs font-bold text-primary mb-2 flex items-center gap-1">
-                  <ShoppingBag size={12} /> NEW ITEMS
-                </h3>
+                <h3 className="font-orbitron text-xs font-bold text-primary mb-2 flex items-center gap-1"><ShoppingBag size={12} /> NEW ITEMS</h3>
               )}
               <div className="space-y-2">
                 {items.map(item => (
@@ -296,35 +271,26 @@ export default function CartTab() {
                   <Input placeholder="Your Name" value={name} onChange={e => setName(e.target.value)} className="bg-muted/30 border-border/50 text-sm" />
                   <Input placeholder="Mobile Number" value={mobile} onChange={e => setMobile(e.target.value)} className="bg-muted/30 border-border/50 text-sm" />
                 </div>
-                <Button
-                  onClick={handleCheckout}
-                  disabled={checkingOut}
-                  className="w-full bg-primary text-primary-foreground hover:bg-primary/80 neon-glow-blue font-orbitron"
-                >
+                <Button onClick={handleCheckout} disabled={checkingOut} className="w-full bg-primary text-primary-foreground hover:bg-primary/80 neon-glow-blue font-orbitron">
                   {checkingOut ? <><Loader2 className="animate-spin mr-2" size={16} /> Processing...</> : 'Confirm Order'}
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Empty state */}
           {items.length === 0 && activeOrders.length === 0 && (
             <p className="text-center text-muted-foreground py-12 text-sm">Your cart is empty</p>
           )}
         </div>
       ) : (
-        // History: completed orders + bookings
         <div className="space-y-4">
           {completedOrders.length === 0 && bookings.length === 0 && (
             <p className="text-center text-muted-foreground py-12 text-sm">No history yet</p>
           )}
 
-          {/* Completed Orders */}
           {completedOrders.length > 0 && (
             <div>
-              <h3 className="font-orbitron text-xs font-bold text-neon-green mb-2 flex items-center gap-1">
-                <Package size={12} /> COMPLETED ORDERS
-              </h3>
+              <h3 className="font-orbitron text-xs font-bold text-neon-green mb-2 flex items-center gap-1"><Package size={12} /> COMPLETED ORDERS</h3>
               {completedOrders.map(order => (
                 <div key={order.id} className="glass rounded-lg p-3 mb-2 opacity-70">
                   <div className="flex justify-between items-start">
@@ -344,7 +310,6 @@ export default function CartTab() {
             </div>
           )}
 
-          {/* Bookings */}
           {upcomingBookings.length > 0 && (
             <div>
               <h3 className="font-orbitron text-xs font-bold text-neon-green mb-2">UPCOMING BOOKINGS</h3>
