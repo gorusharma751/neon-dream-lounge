@@ -4,6 +4,7 @@ import { Trash2, Minus, Plus, ShoppingBag, CalendarDays, Loader2, CheckCircle, C
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
+import { getSessionSafe } from '@/lib/authHelper';
 import { restSelect, restInsert, restUpdate, restDelete } from '@/lib/supabaseRest';
 import { useCart } from '@/hooks/useCart';
 import { toast } from 'sonner';
@@ -51,7 +52,7 @@ export default function CartTab() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getSessionSafe();
       if (!session) { setLoading(false); return; }
       const token = session.access_token;
 
@@ -96,7 +97,7 @@ export default function CartTab() {
   };
 
   const removeItem = async (id: string) => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getSessionSafe();
     if (!session) return;
     await restDelete('cart_items', { id: `eq.${id}` }, session.access_token);
     fetchAll();
@@ -105,7 +106,7 @@ export default function CartTab() {
 
   const updateQty = async (id: string, qty: number) => {
     if (qty < 1) return removeItem(id);
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getSessionSafe();
     if (!session) return;
     await restUpdate('cart_items', { quantity: qty }, { id: `eq.${id}` }, session.access_token);
     setItems(prev => prev.map(i => i.id === id ? { ...i, quantity: qty } : i));
@@ -116,7 +117,7 @@ export default function CartTab() {
   const handleCheckout = async () => {
     if (!name.trim()) { toast.error('Please enter your name'); return; }
     setCheckingOut(true);
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getSessionSafe();
     if (!session) { setCheckingOut(false); return; }
     const token = session.access_token;
 
