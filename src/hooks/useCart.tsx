@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { restSelect } from '@/lib/supabaseRest';
 
 interface CartContextType {
   cartCount: number;
@@ -22,8 +23,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const refreshCart = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setCartCount(0); return; }
-    const { count } = await supabase.from('cart_items').select('*', { count: 'exact', head: true }).eq('user_id', session.user.id);
-    setCartCount(count || 0);
+    const { data } = await restSelect('cart_items', {
+      select: 'id',
+      user_id: `eq.${session.user.id}`,
+    }, session.access_token);
+    setCartCount(data?.length || 0);
   };
 
   useEffect(() => {

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Plus, Minus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { restSelect, restInsert, restUpdate, restSelectSingle } from '@/lib/supabaseRest';
 import { useCart } from '@/hooks/useCart';
 import { toast } from 'sonner';
 
@@ -30,10 +31,10 @@ export default function FoodTab() {
   const { refreshCart } = useCart();
 
   useEffect(() => {
-    supabase.from('food_categories').select('*').order('sort_order').then(({ data }) => {
+    restSelect<Category>('food_categories', { order: 'sort_order' }).then(({ data }) => {
       if (data) setCategories(data);
     });
-    supabase.from('food_items').select('*').eq('is_available', true).then(({ data }) => {
+    restSelect<FoodItem>('food_items', { is_available: 'eq.true' }).then(({ data }) => {
       if (data) setItems(data);
     });
   }, []);
@@ -48,21 +49,22 @@ export default function FoodTab() {
     const qty = quantities[item.id] || 1;
 
     // Check if item already in cart
-    const { data: existing } = await supabase
-      .from('cart_items')
-      .select('id, quantity')
-      .eq('user_id', session.user.id)
-      .eq('food_item_id', item.id)
-      .maybeSingle();
+    const { data: existingArr } = await restSelect<{ id: string; quantity: number }>('cart_items', {
+      select: 'id,quantity',
+      user_id: `eq.${session.user.id}`,
+      food_item_id: `eq.${item.id}`,
+    }, session.access_token);
+
+    const existing = existingArr?.[0];
 
     if (existing) {
-      await supabase.from('cart_items').update({ quantity: existing.quantity + qty }).eq('id', existing.id);
+      await restUpdate('cart_items', { quantity: existing.quantity + qty }, { id: `eq.${existing.id}` }, session.access_token);
     } else {
-      await supabase.from('cart_items').insert({
+      await restInsert('cart_items', {
         user_id: session.user.id,
         food_item_id: item.id,
         quantity: qty,
-      });
+      }, session.access_token);
     }
 
     toast.success(`${item.name} added to cart!`);
@@ -81,7 +83,6 @@ export default function FoodTab() {
 
   return (
     <div className="px-4 pb-4">
-      {/* Category filter - horizontal scroll */}
       <div className="flex gap-2 overflow-x-auto pb-3 mb-4 scrollbar-hide">
         <button
           onClick={() => setActiveCategory('all')}
@@ -109,7 +110,6 @@ export default function FoodTab() {
         ))}
       </div>
 
-      {/* Food grid */}
       <div className="grid grid-cols-2 gap-3">
         {filteredItems.map((item, i) => (
           <motion.div

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Plus, ShoppingCart } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { restSelect, restInsert } from '@/lib/supabaseRest';
 import { useCart } from '@/hooks/useCart';
 import { toast } from 'sonner';
 
@@ -29,13 +30,13 @@ export default function FoodSection() {
   const { refreshCart } = useCart();
 
   useEffect(() => {
-    supabase.from('food_categories').select('*').order('sort_order').then(({ data }) => {
+    restSelect<Category>('food_categories', { order: 'sort_order' }).then(({ data }) => {
       if (data && data.length > 0) {
         setCategories(data);
         setActiveCategory(data[0].id);
       }
     });
-    supabase.from('food_items').select('*').eq('is_available', true).then(({ data }) => {
+    restSelect<FoodItem>('food_items', { is_available: 'eq.true' }).then(({ data }) => {
       if (data) setItems(data);
     });
   }, []);
@@ -46,11 +47,11 @@ export default function FoodSection() {
       toast.error('Please login to add items to cart');
       return;
     }
-    const { error } = await supabase.from('cart_items').insert({
+    const { error } = await restInsert('cart_items', {
       user_id: session.user.id,
       food_item_id: item.id,
       quantity: 1,
-    });
+    }, session.access_token);
     if (error) toast.error('Failed to add to cart');
     else {
       toast.success(`${item.name} added to cart!`);
@@ -75,7 +76,6 @@ export default function FoodSection() {
           <span className="text-primary neon-text-blue">UP</span>
         </motion.h2>
 
-        {/* Category filter */}
         <div className="flex gap-3 justify-center mb-10 flex-wrap">
           {categories.map((cat) => (
             <button
@@ -93,7 +93,6 @@ export default function FoodSection() {
           ))}
         </div>
 
-        {/* Food grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredItems.map((item, i) => (
             <motion.div

@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { useCart } from '@/hooks/useCart';
+import { restSelect, restSelectSingle, restInsert, restUpdate } from '@/lib/supabaseRest';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Loader2, CheckCircle, ChevronLeft, ChevronRight, Gamepad2 } from 'lucide-react';
+import { Loader2, CheckCircle, ChevronLeft, Gamepad2 } from 'lucide-react';
 import { format, addDays, startOfDay } from 'date-fns';
 
 interface Station {
@@ -44,16 +44,26 @@ export default function GamesTab() {
   const [selectedDate, setSelectedDate] = useState(0);
   const [booking, setBooking] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [accessToken, setAccessToken] = useState<string | undefined>();
   const navigate = useNavigate();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setUser(s?.user));
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user);
+      setAccessToken(session?.access_token);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
+      setUser(s?.user);
+      setAccessToken(s?.access_token);
+    });
     return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    supabase.from('gaming_stations').select('*').eq('is_active', true).order('station_number').then(({ data }) => {
+    restSelect<Station>('gaming_stations', {
+      is_active: 'eq.true',
+      order: 'station_number',
+    }).then(({ data }) => {
       if (data) setStations(data);
     });
   }, []);
@@ -69,34 +79,25 @@ export default function GamesTab() {
     const dayStart = targetDate.toISOString();
     const dayEnd = addDays(targetDate, 1).toISOString();
 
-    const { data, error } = await supabase
-      .from('time_slots')
-      .select('*')
-      .eq('station_id', selectedStation.id)
-      .gte('start_time', dayStart)
-      .lt('start_time', dayEnd)
-      .order('start_time');
+    const { data } = await restSelect<TimeSlot>('time_slots', {
+      station_id: `eq.${selectedStation.id}`,
+      start_time: [`gte.${dayStart}`, `lt.${dayEnd}`],
+      order: 'start_time',
+    });
 
-    if (error) {
-      setSlots([]);
-      return;
-    }
-
-    setSlots((data ?? []) as TimeSlot[]);
+    setSlots(data ?? []);
   };
 
   const handleBookSlot = async () => {
     if (!user) { navigate('/auth'); return; }
-    if (!selectedSlot || !selectedStation) return;
+    if (!selectedSlot || !selectedStation || !accessToken) return;
 
     setBooking(true);
 
-    // Re-check slot availability (prevent double booking)
-    const { data: freshSlot } = await supabase
-      .from('time_slots')
-      .select('status')
-      .eq('id', selectedSlot.id)
-      .single();
+    // Re-check slot availability
+    const { data: freshSlot } = await restSelectSingle<{ status: string }>('time_slots', {
+      id: `eq.${selectedSlot.id}`,
+    }, accessToken);
 
     if (!freshSlot || (freshSlot.status !== 'available' && freshSlot.status !== 'reserved')) {
       toast.error('This slot was just booked by another user. Please select another slot.');
@@ -107,36 +108,34 @@ export default function GamesTab() {
     }
 
     // Reserve the slot
-    await supabase.from('time_slots').update({
+    await restUpdate('time_slots', {
       status: 'reserved',
       reserved_by: user.id,
       reserved_until: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-    }).eq('id', selectedSlot.id);
+    }, { id: `eq.${selectedSlot.id}` }, accessToken);
 
     // Create booking
-    const { error } = await supabase.from('bookings').insert({
+    const { error } = await restInsert('bookings', {
       user_id: user.id,
       slot_id: selectedSlot.id,
       station_id: selectedStation.id,
-    });
+    }, accessToken);
 
     if (!error) {
-      // Mark slot as booked
-      await supabase.from('time_slots').update({
+      await restUpdate('time_slots', {
         status: 'booked',
         reserved_by: null,
         reserved_until: null,
-      }).eq('id', selectedSlot.id);
+      }, { id: `eq.${selectedSlot.id}` }, accessToken);
 
       toast.success('Slot booked successfully! 🎮');
       fetchSlots();
     } else {
-      // Rollback reservation
-      await supabase.from('time_slots').update({
+      await restUpdate('time_slots', {
         status: 'available',
         reserved_by: null,
         reserved_until: null,
-      }).eq('id', selectedSlot.id);
+      }, { id: `eq.${selectedSlot.id}` }, accessToken);
       toast.error('Booking failed. Try again.');
     }
 
@@ -144,7 +143,6 @@ export default function GamesTab() {
     setSelectedSlot(null);
   };
 
-  // Use absolute current time for robust future-slot filtering across devices/timezones
   const getNow = () => new Date();
 
   const getSlotColor = (slot: TimeSlot) => {
@@ -162,7 +160,6 @@ export default function GamesTab() {
   return (
     <div className="px-4 pb-4">
       {!selectedStation ? (
-        // Game cards grid
         <div className="space-y-4">
           <h2 className="font-orbitron text-lg font-bold text-foreground text-center">
             Choose Your <span className="text-primary neon-text-blue">Game</span>
@@ -200,7 +197,6 @@ export default function GamesTab() {
           )}
         </div>
       ) : (
-        // Booking section
         <div>
           <button
             onClick={() => { setSelectedStation(null); setSlots([]); }}
@@ -223,7 +219,6 @@ export default function GamesTab() {
             </div>
           </div>
 
-          {/* Date selector - horizontal scroll */}
           <div className="flex gap-2 overflow-x-auto pb-3 mb-4 scrollbar-hide">
             {dates.map((d) => (
               <button
@@ -240,7 +235,6 @@ export default function GamesTab() {
             ))}
           </div>
 
-          {/* Time slots */}
           <div className="space-y-2">
             <div className="flex items-center gap-3 text-[10px] text-muted-foreground mb-2">
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-neon-green" /> Available</span>
@@ -249,11 +243,8 @@ export default function GamesTab() {
             </div>
             <div className="grid grid-cols-4 gap-2">
               {slots.filter((slot) => {
-                // For today, hide past slots
                 if (selectedDate === 0) {
-                  const now = getNow();
-                  const slotTime = new Date(slot.start_time);
-                  return slotTime > now;
+                  return new Date(slot.start_time) > getNow();
                 }
                 return true;
               }).map((slot) => {
@@ -280,7 +271,6 @@ export default function GamesTab() {
         </div>
       )}
 
-      {/* Booking confirmation dialog */}
       <Dialog open={!!selectedSlot} onOpenChange={() => setSelectedSlot(null)}>
         <DialogContent className="glass border-border/30 mx-4">
           <DialogHeader>
@@ -309,4 +299,3 @@ export default function GamesTab() {
     </div>
   );
 }
-
