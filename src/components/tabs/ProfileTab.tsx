@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
+import { getSessionSafe } from '@/lib/authHelper';
 import { restSelect, restUpdate, restRpc } from '@/lib/supabaseRest';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
@@ -45,7 +46,7 @@ export default function ProfileTab() {
   const loadProfile = async () => {
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getSessionSafe();
       if (!session) { setLoading(false); return; }
       const token = session.access_token;
 
@@ -77,7 +78,7 @@ export default function ProfileTab() {
   const saveProfile = async () => {
     if (!user || !profile) return;
     setSaving(true);
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getSessionSafe();
     if (session) {
       await restUpdate('profiles', {
         full_name: profile.full_name,

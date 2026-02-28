@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getSessionSafe } from '@/lib/authHelper';
 import { restSelect } from '@/lib/supabaseRest';
 
 interface CartContextType {
@@ -21,7 +22,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [cartOpen, setCartOpen] = useState(false);
 
   const refreshCart = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getSessionSafe();
     if (!session) { setCartCount(0); return; }
     const { data } = await restSelect('cart_items', {
       select: 'id',

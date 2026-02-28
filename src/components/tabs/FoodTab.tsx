@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Plus, Minus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { getSessionSafe } from '@/lib/authHelper';
 import { restSelect, restInsert, restUpdate, restSelectSingle } from '@/lib/supabaseRest';
 import { useCart } from '@/hooks/useCart';
 import { toast } from 'sonner';
@@ -40,7 +41,7 @@ export default function FoodTab() {
   }, []);
 
   const addToCart = async (item: FoodItem) => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getSessionSafe();
     if (!session) {
       toast.error('Please login to add items');
       return;
