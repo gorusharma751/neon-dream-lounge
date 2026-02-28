@@ -44,30 +44,34 @@ export default function ProfileTab() {
 
   const loadProfile = async () => {
     setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); return; }
-    const token = session.access_token;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setLoading(false); return; }
+      const token = session.access_token;
 
-    setUser(session.user);
+      setUser(session.user);
 
-    const { data: profileArr } = await restSelect('profiles', {
-      user_id: `eq.${session.user.id}`,
-    }, token);
-    setProfile(profileArr?.[0] || null);
+      const { data: profileArr } = await restSelect('profiles', {
+        user_id: `eq.${session.user.id}`,
+      }, token);
+      setProfile(profileArr?.[0] || null);
 
-    const { data: adminCheck } = await restRpc('has_role', {
-      _user_id: session.user.id,
-      _role: 'admin',
-    }, token);
-    setIsAdmin(!!adminCheck);
+      const { data: adminCheck } = await restRpc('has_role', {
+        _user_id: session.user.id,
+        _role: 'admin',
+      }, token);
+      setIsAdmin(!!adminCheck);
 
-    const { data: settingsArr } = await restSelect('admin_settings', {
-      select: 'about_text',
-      limit: '1',
-    });
-    setSettings(settingsArr?.[0] || null);
-
-    setLoading(false);
+      const { data: settingsArr } = await restSelect('admin_settings', {
+        select: 'about_text',
+        limit: '1',
+      });
+      setSettings(settingsArr?.[0] || null);
+    } catch (err) {
+      console.error('Profile load error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const saveProfile = async () => {

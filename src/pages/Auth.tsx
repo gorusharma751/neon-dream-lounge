@@ -18,27 +18,32 @@ export default function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
-    if (isLogin) {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) toast.error(error.message);
-      else {
-        toast.success('Welcome back, gamer! 🎮');
-        navigate('/');
+    try {
+      if (isLogin) {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) toast.error(error.message);
+        else {
+          toast.success('Welcome back, gamer! 🎮');
+          navigate('/');
+        }
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { username },
+            emailRedirectTo: window.location.origin,
+          },
+        });
+        if (error) toast.error(error.message);
+        else toast.success('Account created! Check your email to verify.');
       }
-    } else {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { username },
-          emailRedirectTo: window.location.origin,
-        },
-      });
-      if (error) toast.error(error.message);
-      else toast.success('Account created! Check your email to verify.');
+    } catch (err: any) {
+      console.error('Auth error:', err);
+      toast.error(err?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
