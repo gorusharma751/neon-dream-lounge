@@ -7,7 +7,7 @@ import { getSessionSafe } from '@/lib/authHelper';
 import { restSelect, restUpdate, restRpc } from '@/lib/supabaseRest';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, LogOut, Shield, Loader2, Download, Smartphone } from 'lucide-react';
+import { User, Lock, LogOut, Shield, Loader2, Download, Smartphone, Share2 } from 'lucide-react';
 
 export default function ProfileTab() {
   const [user, setUser] = useState<any>(null);
