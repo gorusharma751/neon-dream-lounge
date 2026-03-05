@@ -41,6 +41,24 @@ export default function ProfileTab() {
     }
   };
 
+  const handleShareApp = async () => {
+    const shareData = {
+      title: 'Nexus Arena - Gaming Lounge',
+      text: 'Check out Nexus Arena! Book gaming slots, order food & more 🎮',
+      url: window.location.origin,
+    };
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') toast.error('Share failed');
+      }
+    } else {
+      await navigator.clipboard.writeText(window.location.origin);
+      toast.success('Link copied to clipboard! 📋');
+    }
+  };
+
   useEffect(() => { loadProfile(); }, []);
 
   const loadProfile = async () => {
