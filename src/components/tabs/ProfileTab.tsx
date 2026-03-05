@@ -7,7 +7,7 @@ import { getSessionSafe } from '@/lib/authHelper';
 import { restSelect, restUpdate, restRpc } from '@/lib/supabaseRest';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, LogOut, Shield, Loader2, Download, Smartphone } from 'lucide-react';
+import { User, Lock, LogOut, Shield, Loader2, Download, Smartphone, Share2 } from 'lucide-react';
 
 export default function ProfileTab() {
   const [user, setUser] = useState<any>(null);
@@ -38,6 +38,24 @@ export default function ProfileTab() {
       setDeferredPrompt(null);
     } else {
       toast.info('Tap the Share button (↑) then "Add to Home Screen" to install the app', { duration: 5000 });
+    }
+  };
+
+  const handleShareApp = async () => {
+    const shareData = {
+      title: 'Nexus Arena - Gaming Lounge',
+      text: 'Check out Nexus Arena! Book gaming slots, order food & more 🎮',
+      url: window.location.origin,
+    };
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') toast.error('Share failed');
+      }
+    } else {
+      await navigator.clipboard.writeText(window.location.origin);
+      toast.success('Link copied to clipboard! 📋');
     }
   };
 
@@ -182,6 +200,10 @@ export default function ProfileTab() {
         {isAppInstalled && (
           <div className="glass rounded-lg p-3 flex items-center gap-2 text-xs text-neon-green"><Smartphone size={14} /> App Installed ✓</div>
         )}
+
+        <Button onClick={handleShareApp} variant="outline" className="w-full border-primary/50 text-primary font-orbitron text-xs hover:bg-primary/10">
+          <Share2 size={14} className="mr-1" /> Share App
+        </Button>
 
         <Button onClick={handleLogout} variant="ghost" className="w-full text-destructive hover:text-destructive font-orbitron text-xs">
           <LogOut size={14} className="mr-1" /> Logout
