@@ -201,6 +201,10 @@ export default function ProfileTab() {
           <div className="glass rounded-lg p-3 flex items-center gap-2 text-xs text-neon-green"><Smartphone size={14} /> App Installed ✓</div>
         )}
 
+        <Button onClick={handleShareApp} variant="outline" className="w-full border-primary/50 text-primary font-orbitron text-xs hover:bg-primary/10">
+          <Share2 size={14} className="mr-1" /> Share App
+        </Button>
+
         <Button onClick={handleLogout} variant="ghost" className="w-full text-destructive hover:text-destructive font-orbitron text-xs">
           <LogOut size={14} className="mr-1" /> Logout
         </Button>
